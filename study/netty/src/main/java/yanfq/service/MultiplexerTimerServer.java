@@ -2,9 +2,12 @@ package yanfq.service;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -55,7 +58,7 @@ public class MultiplexerTimerServer implements Runnable {
                     key = it.next();
                     it.remove();
                     try {
-                        //handleInput(key);
+                        handleInput(key);
                     } catch (Exception e) {
                         if (key != null) {
                             key.cancel();
@@ -79,5 +82,76 @@ public class MultiplexerTimerServer implements Runnable {
         }
     }
 
+    public void handleInput(SelectionKey key) {
+        try {
+            if (key.isValid()) {
+                //处理新接入的请求信息
+                if (key.isAcceptable()) {
+                    //accept 新的连接
+                    handleAccept(key);
+                }
+                if (key.isReadable()) {
+                    //read the data
+                    handleRead(key);
+                }
+
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void doWrite(SocketChannel socketChannel, String response) {
+        try {
+            if(response != null && response.trim().length() > 0){
+                byte[] bytes = response.getBytes();
+                ByteBuffer writeBuffer = ByteBuffer.allocate(bytes.length);
+                writeBuffer.put(bytes);
+                writeBuffer.flip();
+                socketChannel.write(writeBuffer);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void handleAccept(SelectionKey key) throws IOException{
+        ServerSocketChannel serverChannel = (ServerSocketChannel) key.channel();
+        SocketChannel socketChannel = serverChannel.accept();
+        socketChannel.configureBlocking(false);
+        //添加新连接到selector
+        socketChannel.register(selector, SelectionKey.OP_READ);
+    }
+
+    public void handleRead(SelectionKey key) throws IOException{
+        SocketChannel socketChannel = (SocketChannel) key.channel();
+        ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+        int readBytes = socketChannel.read(readBuffer);
+        if (readBytes > 0) {
+            readBuffer.flip();
+            byte[] bytes = new byte[readBuffer.remaining()];
+            readBuffer.get(bytes);
+            String body = new String(bytes, "UTF-8");
+            System.out.println("======body=" + body);
+            String currentTime = "QUERY TIME ORDER".equalsIgnoreCase(body) ? new Date(System.currentTimeMillis()).toString() : "BAD ORDER";
+            doWrite(socketChannel, currentTime);
+        } else if (readBytes < 0) {
+            //对端链路关闭
+            key.cancel();
+            socketChannel.close();
+        } else {
+            //忽略，0字节
+        }
+    }
+
+    public static void handleWrite(SelectionKey key) throws IOException{
+        ByteBuffer buffer = (ByteBuffer)key.attachment();
+        buffer.flip();
+        SocketChannel socketChannel = (SocketChannel) key.channel();
+        while(buffer.hasRemaining()){
+            socketChannel.write(buffer);
+        }
+        buffer.compact();
+    }
 
 }
