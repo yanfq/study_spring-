@@ -1,1 +1,22 @@
 # Created by .ignore support plugin (hsz.mobi)
+/target-eclipse/classes
+/web-app/WEB-INF/classes
+/target/
+/out/
+/test/unit
+/test/integration
+/overlays/
+/db/
+.classpath
+.settings/
+.project
+.idea/
+.sonar/
+.DS_Store
+*.iml
+*.ipr
+*.iws
+*.swp
+*.log
+plugin.xml
+*.zip
